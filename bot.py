@@ -201,7 +201,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == 'rescan':
         await query.message.reply_text("⚡ Tarama Başlatıldı...\n~600 hisse taranıyor, tamamlandığında sonuçlar buraya aktarılacaktır.")
-        # Arka planda kilitlenmeden çalıştırma (Async Task)
         asyncio.create_task(async_rescan_task(query.message.chat_id, context))
 
     elif query.data == 'search_stock':
@@ -310,7 +309,8 @@ def main():
             WAITING_SCORE: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_score_filter)],
             WAITING_TOP_N: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_top_n)],
         },
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('cancel', cancel)],
+        per_message=False
     )
 
     app_bot.add_handler(CommandHandler("start", start))
