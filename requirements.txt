@@ -4,3 +4,4 @@ yfinance
 requests
 lxml
 html5lib
+flask
