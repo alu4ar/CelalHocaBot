@@ -39,7 +39,7 @@ def get_sp500_tickers():
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        html = requests.get(url, headers=headers).text
+        html = requests.get(url, headers=headers, timeout=5).text
         tables = pd.read_html(html)
         return tables[0]['Symbol'].str.replace('.', '-').tolist()
     except Exception as e:
@@ -50,7 +50,7 @@ def get_nasdaq100_tickers():
     url = "https://en.wikipedia.org/wiki/Nasdaq-100"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        html = requests.get(url, headers=headers).text
+        html = requests.get(url, headers=headers, timeout=5).text
         tables = pd.read_html(html)
         for table in tables:
             if 'Ticker' in table.columns:
@@ -67,7 +67,8 @@ def fetch_finnhub_news_sentiment(ticker):
         today = datetime.now().strftime('%Y-%m-%d')
         from_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
         url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={from_date}&to={today}&token={FINNHUB_API_KEY}"
-        res = requests.get(url, timeout=5).json()
+        # Takılmaları önlemek için timeout 2 saniyeye düşürüldü
+        res = requests.get(url, timeout=2).json()
         
         if not isinstance(res, list) or len(res) == 0:
             return 0
@@ -146,7 +147,8 @@ def run_full_scan():
     tickers = sorted(list(sp500.union(nasdaq)))
     results = []
     
-    with ThreadPoolExecutor(max_workers=20) as executor:
+    # Hız optimizasyonu: İş parçacığı sayısı 50'ye çıkarıldı
+    with ThreadPoolExecutor(max_workers=50) as executor:
         futures = {executor.submit(fetch_single_stock_data, t): t for t in tickers}
         for future in as_completed(futures):
             res = future.result()
@@ -183,7 +185,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == 'rescan':
-        await query.message.reply_text("⚡ S&P 500 + NASDAQ 100 Taraması Başlatıldı...\nBu işlem kısa bir süre alır.")
+        await query.message.reply_text("⚡ S&P 500 + NASDAQ 100 Taraması Başlatıldı...\nHızlandırılmış tarama yapılıyor, lütfen bekleyin.")
         
         loop = asyncio.get_running_loop()
         LATEST_DATA = await loop.run_in_executor(None, run_full_scan)
@@ -294,7 +296,7 @@ def main():
         print("HATA: TELEGRAM_BOT_TOKEN bulunamadı!")
         return
 
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    app_bot = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(button_handler)],
@@ -306,11 +308,11 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(conv_handler)
+    app_bot.add_handler(CommandHandler("start", start))
+    app_bot.add_handler(conv_handler)
 
     print("🤖 Telegram Botu Başlatıldı...")
-    app.run_polling()
+    app_bot.run_polling()
 
 if __name__ == '__main__':
     main()
