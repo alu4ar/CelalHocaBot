@@ -1,4 +1,5 @@
 import os
+import asyncio
 import requests
 import pandas as pd
 import yfinance as yf
@@ -25,7 +26,8 @@ def get_sp500_tickers():
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        tables = pd.read_html(requests.get(url, headers=headers).text)
+        html = requests.get(url, headers=headers).text
+        tables = pd.read_html(html)
         return tables[0]['Symbol'].str.replace('.', '-').tolist()
     except Exception as e:
         print(f"S&P 500 Çekilemedi: {e}")
@@ -35,7 +37,8 @@ def get_nasdaq100_tickers():
     url = "https://en.wikipedia.org/wiki/Nasdaq-100"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        tables = pd.read_html(requests.get(url, headers=headers).text)
+        html = requests.get(url, headers=headers).text
+        tables = pd.read_html(html)
         for table in tables:
             if 'Ticker' in table.columns:
                 return table['Ticker'].str.replace('.', '-').tolist()
@@ -167,8 +170,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == 'rescan':
-        await query.message.reply_text("⚡ S&P 500 + NASDAQ 100 Taraması Başlatıldı...\nBu işlem yaklaşık 30-40 saniye sürer.")
-        LATEST_DATA = run_full_scan()
+        await query.message.reply_text("⚡ S&P 500 + NASDAQ 100 Taraması Başlatıldı...\nBu işlem verilerin büyüklüğüne göre kısa bir süre alabilir.")
+        
+        loop = asyncio.get_running_loop()
+        LATEST_DATA = await loop.run_in_executor(None, run_full_scan)
         
         top10 = LATEST_DATA.head(10)
         msg = "🔥 *EN YÜKSEK POTANSİYELLİ İLK 10 HİSSE*\n\n"
@@ -203,7 +208,9 @@ async def process_stock_search(update: Update, context: ContextTypes.DEFAULT_TYP
     ticker = update.message.text.upper().strip()
     await update.message.reply_text(f"🔍 `{ticker}` analizi yapılıyor...", parse_mode='Markdown')
     
-    data = fetch_single_stock_data(ticker)
+    loop = asyncio.get_running_loop()
+    data = await loop.run_in_executor(None, fetch_single_stock_data, ticker)
+    
     if data:
         msg = (
             f"📌 *HİSSE ANALİZ RAPORU: {data['ticker']}*\n"
