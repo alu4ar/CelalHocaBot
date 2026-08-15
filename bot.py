@@ -2,7 +2,7 @@ import os
 import requests
 import pandas as pd
 import yfinance as yf
-from datetime import import datetime, timedelta
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
