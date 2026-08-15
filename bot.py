@@ -1,8 +1,10 @@
 import os
 import asyncio
+import threading
 import requests
 import pandas as pd
 import yfinance as yf
+from flask import Flask
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -11,6 +13,17 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, CallbackQueryHandler,
     MessageHandler, filters, ContextTypes, ConversationHandler
 )
+
+# --- RENDER PORT DİNLENME SUNUCUSU ---
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot Aktif ve Çalışıyor!"
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
 
 # --- AYARLAR VE ENVIRONMENT VARIABLE ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -115,7 +128,7 @@ def calculate_score(data, news):
     score = 0
     if data["inst_ownership"] >= 70: score += 25
     elif data["inst_ownership"] >= 50: score += 15
-    elif data["inst_ownership"] < 30: score -= 10
+    elif data["inst_ownership"] < 0: score -= 10
     
     if data["upside_potential"] >= 20: score += 35
     elif data["upside_potential"] >= 10: score += 20
@@ -170,7 +183,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == 'rescan':
-        await query.message.reply_text("⚡ S&P 500 + NASDAQ 100 Taraması Başlatıldı...\nBu işlem verilerin büyüklüğüne göre kısa bir süre alabilir.")
+        await query.message.reply_text("⚡ S&P 500 + NASDAQ 100 Taraması Başlatıldı...\nBu işlem kısa bir süre alır.")
         
         loop = asyncio.get_running_loop()
         LATEST_DATA = await loop.run_in_executor(None, run_full_scan)
@@ -274,8 +287,11 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- BOT BAŞLATICI ---
 def main():
+    # Render port dinlemesini arka planda başlatır
+    threading.Thread(target=run_web, daemon=True).start()
+
     if not TELEGRAM_BOT_TOKEN:
-        print("HATA: TELEGRAM_BOT_TOKEN bulunamadı! Lütfen Render Environment Variables ayarlarını kontrol edin.")
+        print("HATA: TELEGRAM_BOT_TOKEN bulunamadı!")
         return
 
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
