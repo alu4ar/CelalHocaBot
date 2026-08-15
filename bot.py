@@ -67,7 +67,6 @@ def fetch_finnhub_news_sentiment(ticker):
         today = datetime.now().strftime('%Y-%m-%d')
         from_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
         url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={from_date}&to={today}&token={FINNHUB_API_KEY}"
-        # Takılmaları önlemek için timeout 2 saniyeye düşürüldü
         res = requests.get(url, timeout=2).json()
         
         if not isinstance(res, list) or len(res) == 0:
@@ -77,7 +76,7 @@ def fetch_finnhub_news_sentiment(ticker):
         neg_keywords = ['fall', 'sell', 'downgrade', 'bearish', 'drop', 'loss', 'miss', 'decline']
         
         score = 0
-        for article in res[:10]:
+        for article in res[:5]: # Makale taraması RAM tasarrufu için 5'e düşürüldü
             headline = article.get('headline', '').lower()
             if any(w in headline for w in pos_keywords):
                 score += 2
@@ -147,8 +146,8 @@ def run_full_scan():
     tickers = sorted(list(sp500.union(nasdaq)))
     results = []
     
-    # Hız optimizasyonu: İş parçacığı sayısı 50'ye çıkarıldı
-    with ThreadPoolExecutor(max_workers=50) as executor:
+    # RAM çökmesini önlemek için max_workers 12 seviyesine çekildi
+    with ThreadPoolExecutor(max_workers=12) as executor:
         futures = {executor.submit(fetch_single_stock_data, t): t for t in tickers}
         for future in as_completed(futures):
             res = future.result()
@@ -185,7 +184,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == 'rescan':
-        await query.message.reply_text("⚡ S&P 500 + NASDAQ 100 Taraması Başlatıldı...\nHızlandırılmış tarama yapılıyor, lütfen bekleyin.")
+        await query.message.reply_text("⚡ Taraması Başlatıldı...\nLütfen 1-2 dakika bekleyin.")
         
         loop = asyncio.get_running_loop()
         LATEST_DATA = await loop.run_in_executor(None, run_full_scan)
@@ -289,7 +288,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- BOT BAŞLATICI ---
 def main():
-    # Render port dinlemesini arka planda başlatır
     threading.Thread(target=run_web, daemon=True).start()
 
     if not TELEGRAM_BOT_TOKEN:
