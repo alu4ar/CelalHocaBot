@@ -76,7 +76,7 @@ def fetch_finnhub_news_sentiment(ticker):
         neg_keywords = ['fall', 'sell', 'downgrade', 'bearish', 'drop', 'loss', 'miss', 'decline']
         
         score = 0
-        for article in res[:5]: # Makale taraması RAM tasarrufu için 5'e düşürüldü
+        for article in res[:5]:
             headline = article.get('headline', '').lower()
             if any(w in headline for w in pos_keywords):
                 score += 2
@@ -146,8 +146,7 @@ def run_full_scan():
     tickers = sorted(list(sp500.union(nasdaq)))
     results = []
     
-    # RAM çökmesini önlemek için max_workers 12 seviyesine çekildi
-    with ThreadPoolExecutor(max_workers=12) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(fetch_single_stock_data, t): t for t in tickers}
         for future in as_completed(futures):
             res = future.result()
@@ -178,24 +177,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif update.callback_query:
         await update.callback_query.message.reply_text(welcome_text, parse_mode='Markdown', reply_markup=main_menu_keyboard())
 
+async def async_rescan_task(chat_id, context):
+    global LATEST_DATA
+    loop = asyncio.get_running_loop()
+    LATEST_DATA = await loop.run_in_executor(None, run_full_scan)
+    
+    if LATEST_DATA.empty:
+        await context.bot.send_message(chat_id=chat_id, text="❌ Tarama sırasında veri çekilemedi.")
+        return
+
+    top10 = LATEST_DATA.head(10)
+    msg = "🔥 *EN YÜKSEK POTANSİYELLİ İLK 10 HİSSE*\n\n"
+    for idx, row in top10.iterrows():
+        msg += f"*{idx+1}. {row['ticker']}* - {row['name']}\n"
+        msg += f"📊 Skor: `{row['growth_score']}/100` | Kurumsal: `%{row['inst_ownership']:.1f}` | Hedef Artış: `%{row['upside_potential']:.1f}`\n\n"
+    
+    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown', reply_markup=main_menu_keyboard())
+
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global LATEST_DATA
     query = update.callback_query
     await query.answer()
 
     if query.data == 'rescan':
-        await query.message.reply_text("⚡ Taraması Başlatıldı...\nLütfen 1-2 dakika bekleyin.")
-        
-        loop = asyncio.get_running_loop()
-        LATEST_DATA = await loop.run_in_executor(None, run_full_scan)
-        
-        top10 = LATEST_DATA.head(10)
-        msg = "🔥 *EN YÜKSEK POTANSİYELLİ İLK 10 HİSSE*\n\n"
-        for idx, row in top10.iterrows():
-            msg += f"*{idx+1}. {row['ticker']}* - {row['name']}\n"
-            msg += f"📊 Skor: `{row['growth_score']}/100` | Kurumsal: `%{row['inst_ownership']:.1f}` | Hedef Artış: `%{row['upside_potential']:.1f}`\n\n"
-        
-        await query.message.reply_text(msg, parse_mode='Markdown', reply_markup=main_menu_keyboard())
+        await query.message.reply_text("⚡ Tarama Başlatıldı...\n~600 hisse taranıyor, tamamlandığında sonuçlar buraya aktarılacaktır.")
+        # Arka planda kilitlenmeden çalıştırma (Async Task)
+        asyncio.create_task(async_rescan_task(query.message.chat_id, context))
 
     elif query.data == 'search_stock':
         await query.message.reply_text("🔎 Lütfen analiz etmek istediğiniz hisse sembolünü yazın (Örn: `NVDA`, `AAPL`, `TSLA`):", parse_mode='Markdown')
