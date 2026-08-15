@@ -15,7 +15,7 @@ from telegram.ext import (
 )
 
 # --- AYARLAR ---
-TELEGRAM_BOT_TOKEN = "BURAYA_BOT_TOKEN_YAZIN"
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 FINNHUB_API_KEY = "da0ahvpr01qh1nomg7lgda0ahvpr01qh1nomg7m0"
 
 WAITING_STOCK, WAITING_SCORE, WAITING_TOP_N = range(3)
