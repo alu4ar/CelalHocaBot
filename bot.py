@@ -121,7 +121,9 @@ def calculate_growth_score(data, news):
     return max(0, min(100, score))
 
 def run_full_scan():
-    tickers = sorted(list(set(get_sp500_tickers().union(set(get_nasdaq100_tickers())))))
+    sp500 = set(get_sp500_tickers())
+nasdaq = set(get_nasdaq100_tickers())
+tickers = sorted(list(sp500.union(nasdaq)))
     results = []
     with ThreadPoolExecutor(max_workers=20) as executor:
         futures = {executor.submit(fetch_single_stock_data, t): t for t in tickers}
